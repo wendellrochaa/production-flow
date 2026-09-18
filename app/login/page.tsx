@@ -1,3 +1,75 @@
-"use client";
-import { FormEvent, useState } from "react"; import { useRouter } from "next/navigation";
-export default function Login(){const router=useRouter();const [email,setEmail]=useState("");const [senha,setSenha]=useState("");const [erro,setErro]=useState("");function entrar(e:FormEvent){e.preventDefault();if(!email||!senha){setErro("Preencha e-mail e senha.");return}localStorage.setItem("production-flow-auth",email);router.push("/dashboard");}return <div className="grid min-h-screen lg:grid-cols-2"><div className="hidden bg-slate-950 p-12 text-white lg:flex lg:flex-col lg:justify-between"><div><p className="text-2xl font-bold">ProductionFlow</p><p className="mt-2 max-w-md text-slate-400">Planejamento, acompanhamento e controle da produção em um só lugar.</p></div><div><p className="text-sm text-slate-400">PCP · Produção · Máquinas · Estoque</p></div></div><div className="flex items-center justify-center p-6"><form onSubmit={entrar} className="w-full max-w-md"><p className="text-2xl font-bold">Entrar no sistema</p><p className="mt-1 text-sm text-apagado">Acesse o painel do ProductionFlow.</p><div className="mt-8 space-y-4"><label className="block text-sm font-medium">E-mail<input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="pcp@empresa.com" className="mt-1.5 w-full rounded-lg border border-risco px-3 py-2.5 outline-none focus:border-sinal"/></label><label className="block text-sm font-medium">Senha<input value={senha} onChange={e=>setSenha(e.target.value)} type="password" placeholder="••••••••" className="mt-1.5 w-full rounded-lg border border-risco px-3 py-2.5 outline-none focus:border-sinal"/></label>{erro&&<p className="rounded-lg bg-red-50 p-3 text-sm text-parado">{erro}</p>}<button className="w-full rounded-lg bg-sinal py-2.5 font-semibold text-white hover:bg-blue-700">Entrar</button><p className="text-center text-xs text-apagado">Modo demonstração: qualquer e-mail e senha funcionam.</p></div></form></div></div>}
+'use client';
+
+import { useActionState } from 'react';
+import { loginAction } from '@/lib/actions';
+
+const initialState = {
+  error: '',
+  success: false,
+};
+
+export default function LoginPage() {
+  const [state, formAction, isPending] = useActionState(loginAction, initialState);
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl shadow-slate-950/60">
+        <div className="border-b border-slate-800 bg-slate-900 px-6 py-5 text-center">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-cyan-500/15 text-2xl font-bold text-cyan-300">P</div>
+          <h1 className="text-2xl font-bold text-white">ProductionFlow</h1>
+          <p className="mt-1 text-sm text-slate-400">Sistema de PCP e produção</p>
+        </div>
+
+        <form action={formAction} className="space-y-5 p-6">
+          <div>
+            <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-200">
+              E-mail
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              placeholder="nome@adm.com"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-slate-50 outline-none ring-0 transition focus:border-cyan-400"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="senha" className="mb-2 block text-sm font-medium text-slate-200">
+              Senha
+            </label>
+            <input
+              id="senha"
+              name="senha"
+              type="password"
+              required
+              placeholder="••••••••"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-slate-50 outline-none ring-0 transition focus:border-cyan-400"
+            />
+          </div>
+
+          {state?.error ? (
+            <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {state.error}
+            </div>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={isPending}
+            className="w-full rounded-xl bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isPending ? 'Entrando...' : 'Entrar'}
+          </button>
+        </form>
+
+        <div className="border-t border-slate-800 bg-slate-950/40 px-6 py-4 text-xs text-slate-400">
+          <p>Credenciais iniciais:</p>
+          <p>Gestor: gestor@adm.com / Admin123!</p>
+          <p>Funcionário: funcionario@funcionario.com / Funcionario123!</p>
+        </div>
+      </div>
+    </main>
+  );
+}

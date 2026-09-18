@@ -2,9 +2,9 @@ import { getCurrentUser } from '@/lib/auth';
 import Sidebar from '@/components/Sidebar';
 import { redirect } from 'next/navigation';
 
-export default async function FuncionarioTarefasLayout({ children }: { children: React.ReactNode }) {
+export default async function MaquinasLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
-  if (!user || user.perfil !== 'FUNCIONARIO') redirect('/login');
+  if (!user || user.perfil !== 'GESTOR') redirect('/login');
 
   return (
     <div className="flex min-h-screen">

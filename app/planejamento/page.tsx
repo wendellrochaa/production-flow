@@ -1,4 +1,48 @@
-"use client";
-import {FormEvent,useState} from "react"; import Header from "@/components/Header"; import Card from "@/components/Card"; import {useData} from "@/components/DataProvider";
-const horas=["07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00"];
-export default function Planejamento(){const {schedules,machines,orders,addSchedule}=useData();const [dia,setDia]=useState("2026-09-17");const [form,setForm]=useState({ordem:"",maquina:"CNC-01",inicio:"08:00",fim:"10:00"});const [msg,setMsg]=useState("");function salvar(e:FormEvent){e.preventDefault();if(!form.ordem)return;const conflito=schedules.some(s=>s.data===dia&&s.maquina===form.maquina&&s.horaInicio<form.fim&&form.inicio<s.horaFim);if(conflito){setMsg("Conflito: já existe uma OP nessa máquina e horário.");return}addSchedule({ordem:Number(form.ordem),maquina:form.maquina,data:dia,horaInicio:form.inicio,horaFim:form.fim});setMsg("Programação adicionada.");}return <><Header titulo="Planejamento" descricao="Alocação de OPs por máquina e horário"/><div className="space-y-6 p-6"><Card titulo="Nova programação"><form onSubmit={salvar} className="grid gap-3 md:grid-cols-5"><select value={form.ordem} onChange={e=>setForm({...form,ordem:e.target.value})} className="rounded-lg border border-risco px-3 py-2 text-sm"><option value="">Escolha a OP</option>{orders.filter(o=>o.status!=="FINALIZADA").map(o=><option key={o.id} value={o.id}>#{o.id} · {o.produto}</option>)}</select><select value={form.maquina} onChange={e=>setForm({...form,maquina:e.target.value})} className="rounded-lg border border-risco px-3 py-2 text-sm">{machines.map(m=><option key={m.id}>{m.nome}</option>)}</select><input type="time" value={form.inicio} onChange={e=>setForm({...form,inicio:e.target.value})} className="rounded-lg border border-risco px-3 py-2 text-sm"/><input type="time" value={form.fim} onChange={e=>setForm({...form,fim:e.target.value})} className="rounded-lg border border-risco px-3 py-2 text-sm"/><button className="rounded-lg bg-sinal px-3 py-2 text-sm font-semibold text-white">Adicionar</button></form>{msg&&<p className="mt-3 text-sm text-apagado">{msg}</p>}</Card><Card titulo="Programação do dia"><div className="mb-4"><input type="date" value={dia} onChange={e=>setDia(e.target.value)} className="rounded-lg border border-risco px-3 py-2 text-sm"/></div><div className="overflow-x-auto"><table className="w-full min-w-[700px] text-sm"><thead><tr className="text-left text-xs text-apagado"><th className="w-20 px-2 py-2">Hora</th>{machines.map(m=><th key={m.id} className="px-2 py-2">{m.nome}</th>)}</tr></thead><tbody>{horas.map(h=><tr key={h} className="border-t border-risco/60"><td className="num px-2 py-2 text-apagado">{h}</td>{machines.map(m=>{const s=schedules.find(x=>x.data===dia&&x.maquina===m.nome&&x.horaInicio===h);return <td key={m.id} className="px-2 py-2">{s?<div className="rounded-lg border border-blue-200 bg-blue-50 p-2"><p className="num font-semibold text-sinal">OP #{s.ordem}</p><p className="num text-xs text-apagado">{s.horaInicio}–{s.horaFim}</p></div>:<span className="text-slate-300">—</span>}</td>})}</tr>)}</tbody></table></div></Card></div></>}
+import { prisma } from '@/lib/prisma';
+import { createOcorrenciaAction } from '@/lib/actions';
+import { requireRole } from '@/lib/auth';
+import { statusClass } from '@/lib/ui';
+
+export default async function OcorrenciasPage() {
+  await requireRole(['GESTOR']);
+  const ocorrencias = await prisma.ocorrencia.findMany({
+    include: { usuario: true, maquina: true },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return (
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6">
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Ocorrências</p>
+          <h1 className="text-3xl font-bold text-slate-900">Reclamações e ocorrências</h1>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 font-semibold text-slate-700">Título</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Tipo</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Máquina</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Funcionário</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {ocorrencias.map((oc) => (
+                <tr key={oc.id}>
+                  <td className="px-4 py-3"><div className="font-medium text-slate-900">{oc.titulo}</div><div className="text-xs text-slate-500">{oc.descricao}</div></td>
+                  <td className="px-4 py-3">{oc.tipo}</td>
+                  <td className="px-4 py-3">{oc.maquina?.nome ?? '—'}</td>
+                  <td className="px-4 py-3">{oc.usuario?.nome ?? '—'}</td>
+                  <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(oc.status)}`}>{oc.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  );
+}

@@ -1,35 +1,32 @@
 'use server';
 
 import bcrypt from 'bcryptjs';
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser, registerAudit, requireRole, setSessionCookie, clearSessionCookie } from '@/lib/auth';
+import { clearSessionCookie, getCurrentUser, registerAudit, requireRole, setSessionCookie, signSession } from '@/lib/auth';
 
-export async function loginAction(formData: FormData) {
+export async function loginAction(_prevState: { error?: string; success?: boolean }, formData: FormData) {
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
-  const senha = String(formData.get('senha') ?? '');
+  const senha = String(formData.get('senha') ?? '').trim();
 
   if (!email || !senha) {
-    throw new Error('Email e senha são obrigatórios.');
+    return { error: 'Informe e-mail e senha.', success: false };
   }
 
   const usuario = await prisma.usuario.findUnique({ where: { email } });
   if (!usuario || usuario.status !== 'ATIVO') {
-    throw new Error('Credenciais inválidas.');
+    return { error: 'Credenciais inválidas.', success: false };
   }
 
-  const validPassword = await bcrypt.compare(senha, usuario.senha);
-  if (!validPassword) {
-    throw new Error('Credenciais inválidas.');
+  const isValid = await bcrypt.compare(senha, usuario.senha);
+  if (!isValid) {
+    return { error: 'Credenciais inválidas.', success: false };
   }
 
-  const token = require('node:crypto')
-    .createHmac('sha256', process.env.SESSION_SECRET || 'development-secret-change-me')
-    .update(JSON.stringify({ userId: usuario.id, perfil: usuario.perfil, email: usuario.email }))
-    .digest('hex');
+  const token = signSession({ userId: usuario.id, perfil: usuario.perfil as 'GESTOR' | 'FUNCIONARIO', email: usuario.email });
+  setSessionCookie(token);
 
-  setSessionCookie(`${usuario.id}:${token}`);
   await registerAudit({
     usuarioId: usuario.id,
     acao: 'LOGIN',
@@ -67,12 +64,19 @@ export async function createUsuarioAction(formData: FormData) {
   const perfil = String(formData.get('perfil') ?? 'FUNCIONARIO').trim();
 
   if (!nome || !email || !senha) {
-    throw new Error('Dados do funcionário são obrigatórios.');
+    throw new Error('Nome, e-mail e senha são obrigatórios.');
   }
 
   const hash = await bcrypt.hash(senha, 10);
   const usuario = await prisma.usuario.create({
-    data: { nome, email, senha: hash, cargo, perfil, status: 'ATIVO' },
+    data: {
+      nome,
+      email,
+      senha: hash,
+      cargo,
+      perfil,
+      status: 'ATIVO',
+    },
   });
 
   const gestor = await getCurrentUser();
@@ -82,7 +86,7 @@ export async function createUsuarioAction(formData: FormData) {
       acao: 'CADASTRO_USUARIO',
       entidade: 'Usuario',
       entidadeId: usuario.id,
-      descricao: `Gestor ${gestor.nome} cadastrou o funcionário ${usuario.nome}.`,
+      descricao: `Gestor ${gestor.nome} cadastrou ${usuario.nome}.`,
     });
   }
 
@@ -91,44 +95,43 @@ export async function createUsuarioAction(formData: FormData) {
 }
 
 export async function createOrdemAction(formData: FormData) {
-  const user = await requireRole(['GESTOR']);
+  const gestor = await requireRole(['GESTOR']);
 
   const produto = String(formData.get('produto') ?? '').trim();
   const quantidadePlanejada = Number(formData.get('quantidadePlanejada') ?? 0);
   const prioridade = String(formData.get('prioridade') ?? 'MEDIA').trim();
   const observacoes = String(formData.get('observacoes') ?? '').trim();
   const prazo = formData.get('prazo') ? new Date(String(formData.get('prazo'))) : null;
-  const maquinaId = formData.get('maquinaId') ? Number(formData.get('maquinaId')) : null;
   const responsavelId = formData.get('responsavelId') ? Number(formData.get('responsavelId')) : null;
+  const maquinaId = formData.get('maquinaId') ? Number(formData.get('maquinaId')) : null;
 
-  if (!produto || quantidadePlanejada <= 0) {
+  if (!produto || !quantidadePlanejada || quantidadePlanejada <= 0) {
     throw new Error('Produto e quantidade são obrigatórios.');
   }
 
-  const codigo = `OP-${Date.now()}`;
   const ordem = await prisma.ordem.create({
     data: {
-      codigo,
+      codigo: `OP-${Date.now()}`,
       produto,
       quantidadePlanejada,
+      quantidadeProduzida: 0,
       quantidadeRestante: quantidadePlanejada,
       prioridade,
+      status: 'AGUARDANDO',
       observacoes: observacoes || null,
       prazo: prazo ?? null,
       maquinaId: maquinaId ?? null,
       responsavelId: responsavelId ?? null,
-      criadoPorId: user.id,
-      status: 'AGUARDANDO',
-      dataInicio: null,
+      criadoPorId: gestor.id,
     },
   });
 
   await registerAudit({
-    usuarioId: user.id,
+    usuarioId: gestor.id,
     acao: 'CRIAR_ORDEM',
     entidade: 'Ordem',
     entidadeId: ordem.id,
-    descricao: `Gestor ${user.nome} criou a OP #${ordem.codigo}.`,
+    descricao: `Gestor ${gestor.nome} criou a OP #${ordem.codigo}.`,
   });
 
   revalidatePath('/ordens');
@@ -136,56 +139,51 @@ export async function createOrdemAction(formData: FormData) {
 }
 
 export async function updateOrdemStatusAction(orderId: number, status: string) {
-  const user = await requireRole(['GESTOR']);
+  const gestor = await requireRole(['GESTOR']);
 
   const ordem = await prisma.ordem.findUnique({ where: { id: orderId } });
   if (!ordem) return;
-
-  const dataConclusao = status === 'CONCLUIDA' ? new Date() : ordem.dataConclusao;
-  const dataInicio = status === 'EM_PRODUCAO' && !ordem.dataInicio ? new Date() : ordem.dataInicio;
 
   await prisma.ordem.update({
     where: { id: orderId },
     data: {
       status,
-      dataInicio: dataInicio ?? null,
-      dataConclusao: dataConclusao ?? null,
-      updatedAt: new Date(),
+      dataInicio: status === 'EM_PRODUCAO' && !ordem.dataInicio ? new Date() : ordem.dataInicio,
+      dataConclusao: status === 'CONCLUIDA' ? new Date() : ordem.dataConclusao,
+      quantidadeRestante: Math.max(0, ordem.quantidadePlanejada - ordem.quantidadeProduzida),
     },
   });
 
   await registerAudit({
-    usuarioId: user.id,
+    usuarioId: gestor.id,
     acao: 'ALTERAR_STATUS_ORDEM',
     entidade: 'Ordem',
     entidadeId: ordem.id,
-    descricao: `Gestor ${user.nome} alterou a OP #${ordem.codigo} para ${status}.`,
+    descricao: `Gestor ${gestor.nome} alterou a OP #${ordem.codigo} para ${status}.`,
   });
 
   revalidatePath('/ordens');
-  redirect('/ordens');
 }
 
 export async function deleteOrdemAction(orderId: number) {
-  const user = await requireRole(['GESTOR']);
+  const gestor = await requireRole(['GESTOR']);
   const ordem = await prisma.ordem.findUnique({ where: { id: orderId } });
   if (!ordem) return;
 
   await prisma.ordem.delete({ where: { id: orderId } });
   await registerAudit({
-    usuarioId: user.id,
+    usuarioId: gestor.id,
     acao: 'EXCLUIR_ORDEM',
     entidade: 'Ordem',
     entidadeId: ordem.id,
-    descricao: `Gestor ${user.nome} cancelou/excluiu a OP #${ordem.codigo}.`,
+    descricao: `Gestor ${gestor.nome} cancelou a OP #${ordem.codigo}.`,
   });
 
   revalidatePath('/ordens');
-  redirect('/ordens');
 }
 
 export async function createTarefaAction(formData: FormData) {
-  const user = await requireRole(['GESTOR']);
+  const gestor = await requireRole(['GESTOR']);
 
   const titulo = String(formData.get('titulo') ?? '').trim();
   const descricao = String(formData.get('descricao') ?? '').trim();
@@ -204,17 +202,17 @@ export async function createTarefaAction(formData: FormData) {
       prioridade,
       prazo: prazo ?? null,
       responsavelId: responsavelId ?? null,
-      criadaPorId: user.id,
+      criadaPorId: gestor.id,
       status: 'PENDENTE',
     },
   });
 
   await registerAudit({
-    usuarioId: user.id,
+    usuarioId: gestor.id,
     acao: 'CRIAR_TAREFA',
     entidade: 'Tarefa',
     entidadeId: tarefa.id,
-    descricao: `Gestor ${user.nome} criou a tarefa #${tarefa.id}.`,
+    descricao: `Gestor ${gestor.nome} criou a tarefa #${tarefa.id}.`,
   });
 
   revalidatePath('/tarefas');
@@ -222,39 +220,39 @@ export async function createTarefaAction(formData: FormData) {
 }
 
 export async function updateTarefaStatusAction(taskId: number, status: string) {
-  const user = await requireRole(['GESTOR', 'FUNCIONARIO']);
+  const usuario = await requireRole(['GESTOR', 'FUNCIONARIO']);
 
   const tarefa = await prisma.tarefa.findUnique({ where: { id: taskId } });
   if (!tarefa) return;
 
-  if (user.perfil === 'FUNCIONARIO' && tarefa.responsavelId !== user.id) {
+  if (usuario.perfil === 'FUNCIONARIO' && tarefa.responsavelId !== usuario.id) {
     throw new Error('Você só pode alterar suas próprias tarefas.');
   }
 
-  const payload: Record<string, string | number | null> = { status };
-  if (status === 'ACEITA') payload.aceitaPorId = user.id;
-  if (status === 'EM_ANDAMENTO') payload.iniciadaPorId = user.id;
-  if (status === 'CONCLUIDA') payload.concluidaPorId = user.id;
+  const updateData: Record<string, any> = { status };
+  if (status === 'ACEITA') updateData.aceitaPorId = usuario.id;
+  if (status === 'EM_ANDAMENTO') updateData.iniciadaPorId = usuario.id;
+  if (status === 'CONCLUIDA') updateData.concluidaPorId = usuario.id;
 
   await prisma.tarefa.update({
     where: { id: taskId },
-    data: payload,
+    data: updateData,
   });
 
   await registerAudit({
-    usuarioId: user.id,
+    usuarioId: usuario.id,
     acao: status,
     entidade: 'Tarefa',
     entidadeId: tarefa.id,
-    descricao: `${user.nome} alterou a tarefa #${tarefa.id} para ${status}.`,
+    descricao: `${usuario.nome} alterou a tarefa #${tarefa.id} para ${status}.`,
   });
 
   revalidatePath('/tarefas');
-  redirect('/funcionario/tarefas');
+  revalidatePath('/funcionario/tarefas');
 }
 
 export async function createPedidoAction(formData: FormData) {
-  const user = await requireRole(['FUNCIONARIO']);
+  const usuario = await requireRole(['FUNCIONARIO']);
 
   const tipo = String(formData.get('tipo') ?? '').trim();
   const titulo = String(formData.get('titulo') ?? '').trim();
@@ -273,17 +271,17 @@ export async function createPedidoAction(formData: FormData) {
       descricao,
       prioridade,
       observacao: observacao || null,
-      usuarioId: user.id,
+      usuarioId: usuario.id,
       status: 'ABERTO',
     },
   });
 
   await registerAudit({
-    usuarioId: user.id,
+    usuarioId: usuario.id,
     acao: 'CRIAR_PEDIDO',
     entidade: 'Pedido',
     entidadeId: pedido.id,
-    descricao: `${user.nome} criou o pedido #${pedido.id}.`,
+    descricao: `${usuario.nome} criou o pedido #${pedido.id}.`,
   });
 
   revalidatePath('/funcionario/pedidos');
@@ -291,7 +289,7 @@ export async function createPedidoAction(formData: FormData) {
 }
 
 export async function createOcorrenciaAction(formData: FormData) {
-  const user = await requireRole(['FUNCIONARIO']);
+  const usuario = await requireRole(['FUNCIONARIO']);
 
   const tipo = String(formData.get('tipo') ?? '').trim();
   const titulo = String(formData.get('titulo') ?? '').trim();
@@ -310,17 +308,17 @@ export async function createOcorrenciaAction(formData: FormData) {
       descricao,
       prioridade,
       maquinaId: maquinaId ?? null,
-      usuarioId: user.id,
+      usuarioId: usuario.id,
       status: 'ABERTA',
     },
   });
 
   await registerAudit({
-    usuarioId: user.id,
+    usuarioId: usuario.id,
     acao: 'ABRIR_OCORRENCIA',
     entidade: 'Ocorrencia',
     entidadeId: ocorrencia.id,
-    descricao: `${user.nome} abriu a ocorrência #${ocorrencia.id}.`,
+    descricao: `${usuario.nome} abriu a ocorrência #${ocorrencia.id}.`,
   });
 
   revalidatePath('/funcionario/ocorrencias');
@@ -363,8 +361,8 @@ export async function createProdutoAction(formData: FormData) {
   redirect('/estoque');
 }
 
-export async function adicionarMovimentacaoAction(formData: FormData) {
-  const user = await requireRole(['GESTOR']);
+export async function createMovimentacaoAction(formData: FormData) {
+  const gestor = await requireRole(['GESTOR']);
 
   const produtoId = Number(formData.get('produtoId'));
   const tipo = String(formData.get('tipo') ?? 'ENTRADA').trim();
@@ -378,13 +376,13 @@ export async function adicionarMovimentacaoAction(formData: FormData) {
   const estoque = await prisma.estoque.findUnique({ where: { produtoId } });
   if (!estoque) return;
 
-  const novoValor = tipo === 'SAIDA' ? estoque.quantidade - quantidade : estoque.quantidade + quantidade;
+  const novaQuantidade = tipo === 'SAIDA' ? estoque.quantidade - quantidade : estoque.quantidade + quantidade;
 
   await prisma.estoque.update({
     where: { produtoId },
     data: {
-      quantidade: Math.max(0, novoValor),
-      status: novoValor <= estoque.estoqueMinimo ? 'BAIXO' : 'NORMAL',
+      quantidade: Math.max(0, novaQuantidade),
+      status: novaQuantidade <= estoque.estoqueMinimo ? 'BAIXO' : 'NORMAL',
     },
   });
 
@@ -395,16 +393,16 @@ export async function adicionarMovimentacaoAction(formData: FormData) {
       tipo,
       quantidade,
       observacao: observacao || null,
-      usuarioId: user.id,
+      usuarioId: gestor.id,
     },
   });
 
   await registerAudit({
-    usuarioId: user.id,
+    usuarioId: gestor.id,
     acao: 'MOVIMENTACAO_ESTOQUE',
     entidade: 'Estoque',
     entidadeId: produtoId,
-    descricao: `${user.nome} registrou ${tipo.toLowerCase()} de ${quantidade} no estoque.`,
+    descricao: `${gestor.nome} registrou ${tipo.toLowerCase()} de ${quantidade} no estoque.`,
   });
 
   revalidatePath('/estoque');
@@ -423,7 +421,14 @@ export async function createMaquinaAction(formData: FormData) {
   if (!nome || !codigo) throw new Error('Nome e código são obrigatórios.');
 
   await prisma.maquina.create({
-    data: { nome, codigo, setor, capacidade, observacao: observacao || null, status: 'DISPONIVEL' },
+    data: {
+      nome,
+      codigo,
+      setor,
+      capacidade,
+      observacao: observacao || null,
+      status: 'DISPONIVEL',
+    },
   });
 
   revalidatePath('/maquinas');
@@ -442,31 +447,38 @@ export async function createPlanejamentoAction(formData: FormData) {
   if (!ordemId || !maquinaId) throw new Error('Ordem e máquina são obrigatórios.');
 
   await prisma.planejamento.create({
-    data: { ordemId, maquinaId, data, horarioInicio, horarioFim, status: 'PLANEJADO' },
+    data: {
+      ordemId,
+      maquinaId,
+      data,
+      horarioInicio,
+      horarioFim,
+      status: 'PLANEJADO',
+    },
   });
 
   revalidatePath('/planejamento');
   redirect('/planejamento');
 }
 
-export async function createRelatorioAction() {
-  await requireRole(['GESTOR']);
-  redirect('/relatorios');
-}
-
 export async function updatePerfilAction(formData: FormData) {
-  const user = await requireRole(['GESTOR', 'FUNCIONARIO']);
+  const usuario = await requireRole(['GESTOR', 'FUNCIONARIO']);
+
   const nome = String(formData.get('nome') ?? '').trim();
   const cargo = String(formData.get('cargo') ?? '').trim();
 
-  if (!nome) throw new Error('Nome é obrigatório.');
+  if (!nome) {
+    throw new Error('Nome é obrigatório.');
+  }
 
   await prisma.usuario.update({
-    where: { id: user.id },
-    data: { nome, cargo: cargo || user.cargo },
+    where: { id: usuario.id },
+    data: {
+      nome,
+      cargo: cargo || usuario.cargo,
+    },
   });
 
   revalidatePath('/funcionario/perfil');
   redirect('/funcionario/perfil');
 }
-$$

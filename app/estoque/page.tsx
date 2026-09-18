@@ -1,3 +1,51 @@
-"use client";
-import {useState} from "react"; import Header from "@/components/Header"; import Card from "@/components/Card"; import StatusBadge from "@/components/StatusBadge"; import {useData} from "@/components/DataProvider";
-export default function Estoque(){const {stock,addStock,removeStock}=useData();const [mov,setMov]=useState<{id:number,tipo:"entrada"|"saida"}|null>(null);const [qtd,setQtd]=useState("");function aplicar(){const n=Number(qtd);if(mov&&n>0)(mov.tipo==="entrada"?addStock:removeStock)(mov.id,n);setQtd("");setMov(null)}return <><Header titulo="Estoque" descricao="Controle de matérias-primas e materiais"/><div className="p-6"><Card><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-risco text-left text-xs text-apagado"><th className="px-3 py-2">Material</th><th className="px-3 py-2">Código</th><th className="px-3 py-2">Saldo</th><th className="px-3 py-2">Mínimo</th><th className="px-3 py-2">Situação</th><th className="px-3 py-2">Movimentar</th></tr></thead><tbody>{stock.map(s=>{const baixo=s.quantidade<s.minimo;return <tr key={s.id} className="border-b border-risco/60"><td className="px-3 py-3 font-medium">{s.produto}</td><td className="px-3 py-3 text-apagado">{s.codigo}</td><td className="num px-3 py-3">{s.quantidade} {s.unidade}</td><td className="num px-3 py-3">{s.minimo} {s.unidade}</td><td className="px-3 py-3"><StatusBadge valor={baixo?"ATRASADA":"DISPONIVEL"}/></td><td className="px-3 py-3"><div className="flex gap-2"><button onClick={()=>setMov({id:s.id,tipo:"entrada"})} className="rounded bg-ok/10 px-2.5 py-1.5 text-xs font-semibold text-ok">+ Entrada</button><button onClick={()=>setMov({id:s.id,tipo:"saida"})} className="rounded bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-parado">− Saída</button></div></td></tr>})}</tbody></table></div></Card></div>{mov&&<div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4"><div className="w-full max-w-sm rounded-xl bg-white p-5"><h2 className="font-semibold">{mov.tipo==="entrada"?"Entrada":"Saída"} de estoque</h2><input autoFocus type="number" min="1" value={qtd} onChange={e=>setQtd(e.target.value)} className="mt-4 w-full rounded-lg border border-risco px-3 py-2.5" placeholder="Quantidade"/><div className="mt-4 flex gap-2"><button onClick={aplicar} className="flex-1 rounded-lg bg-sinal py-2 font-semibold text-white">Confirmar</button><button onClick={()=>setMov(null)} className="flex-1 rounded-lg border border-risco py-2">Cancelar</button></div></div></div>}</>}
+import { prisma } from '@/lib/prisma';
+import { createMaquinaAction } from '@/lib/actions';
+import { requireRole } from '@/lib/auth';
+import { statusClass } from '@/lib/ui';
+
+export default async function MaquinasPage() {
+  await requireRole(['GESTOR']);
+  const maquinas = await prisma.maquina.findMany({ orderBy: { nome: 'asc' } });
+
+  return (
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6">
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Máquinas</p>
+          <h1 className="text-3xl font-bold text-slate-900">Parque industrial</h1>
+        </div>
+
+        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">Cadastrar máquina</h2>
+          <form action={createMaquinaAction} className="grid gap-4 md:grid-cols-4">
+            <input name="nome" placeholder="Nome" className="rounded-xl border border-slate-300 px-3 py-2" required />
+            <input name="codigo" placeholder="Código" className="rounded-xl border border-slate-300 px-3 py-2" required />
+            <input name="setor" placeholder="Setor" className="rounded-xl border border-slate-300 px-3 py-2" defaultValue="PRODUCAO" />
+            <input name="capacidade" type="number" placeholder="Capacidade" className="rounded-xl border border-slate-300 px-3 py-2" />
+            <textarea name="observacao" placeholder="Observação" className="md:col-span-4 rounded-xl border border-slate-300 px-3 py-2" rows={3} />
+            <button type="submit" className="md:col-span-4 rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-500">Salvar máquina</button>
+          </form>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {maquinas.map((maquina) => (
+            <div key={maquina.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xl font-bold text-slate-900">{maquina.nome}</p>
+                  <p className="text-sm text-slate-500">{maquina.codigo}</p>
+                </div>
+                <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(maquina.status)}`}>{maquina.status}</span>
+              </div>
+              <div className="mt-4 space-y-1 text-sm text-slate-600">
+                <p>Setor: {maquina.setor}</p>
+                <p>Capacidade: {maquina.capacidade}</p>
+                <p>Observação: {maquina.observacao ?? '—'}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}

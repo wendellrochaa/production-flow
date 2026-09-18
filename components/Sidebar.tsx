@@ -1,4 +1,26 @@
-"use client";
-import Link from "next/link"; import { usePathname, useRouter } from "next/navigation";
-const menu=[{href:"/dashboard",nome:"Dashboard",icon:"▦"},{href:"/ordens",nome:"Ordens de produção",icon:"▤"},{href:"/planejamento",nome:"Planejamento",icon:"◷"},{href:"/maquinas",nome:"Máquinas",icon:"⚙"},{href:"/estoque",nome:"Estoque",icon:"▣"},{href:"/ocorrencias",nome:"Ocorrências",icon:"⚠"},{href:"/relatorios",nome:"Relatórios",icon:"▥"}];
-export default function Sidebar(){const rota=usePathname();const router=useRouter();return <aside className="hidden min-h-screen w-64 shrink-0 border-r border-risco bg-slate-950 text-white md:flex md:flex-col"><div className="border-b border-white/10 p-5"><p className="text-lg font-bold">ProductionFlow</p><p className="mt-1 text-xs text-slate-400">Planejamento e Controle da Produção</p></div><nav className="flex-1 p-3"><p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Menu principal</p>{menu.map(i=>{const ativo=rota.startsWith(i.href);return <Link key={i.href} href={i.href} className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${ativo?"bg-white/10 font-semibold text-white":"text-slate-400 hover:bg-white/5 hover:text-white"}`}><span className="w-5 text-center">{i.icon}</span>{i.nome}</Link>})}</nav><div className="border-t border-white/10 p-3"><button onClick={()=>{localStorage.removeItem("production-flow-auth");router.push("/login")}} className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 hover:bg-white/5 hover:text-white">↪ Sair</button></div></aside>}
+import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth';
+import { updatePerfilAction } from '@/lib/actions';
+
+export default async function FuncionarioPerfilPage() {
+  const user = await requireRole(['GESTOR', 'FUNCIONARIO']);
+  const perfil = await prisma.usuario.findUnique({ where: { id: user.id } });
+
+  if (!perfil) return null;
+
+  return (
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Perfil</p>
+        <h1 className="mt-2 text-3xl font-bold text-slate-900">Dados do usuário</h1>
+
+        <form action={updatePerfilAction} className="mt-6 space-y-4">
+          <input name="nome" defaultValue={perfil.nome} className="w-full rounded-xl border border-slate-300 px-3 py-2" required />
+          <input name="cargo" defaultValue={perfil.cargo} className="w-full rounded-xl border border-slate-300 px-3 py-2" />
+          <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">E-mail: {perfil.email}</div>
+          <button type="submit" className="w-full rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-500">Salvar alterações</button>
+        </form>
+      </div>
+    </main>
+  );
+}

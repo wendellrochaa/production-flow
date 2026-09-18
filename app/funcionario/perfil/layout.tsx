@@ -2,7 +2,7 @@ import { getCurrentUser } from '@/lib/auth';
 import Sidebar from '@/components/Sidebar';
 import { redirect } from 'next/navigation';
 
-export default async function FuncionarioTarefasLayout({ children }: { children: React.ReactNode }) {
+export default async function FuncionarioOcorrenciasLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user || user.perfil !== 'FUNCIONARIO') redirect('/login');
 

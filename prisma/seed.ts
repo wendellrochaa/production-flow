@@ -33,19 +33,19 @@ async function main() {
     },
   });
 
-  const materialAco = await prisma.produto.upsert({
+  const produtoAco = await prisma.produto.upsert({
     where: { codigo: 'ACO-01' },
     update: {},
     create: {
       nome: 'Aço Carbono',
       codigo: 'ACO-01',
       unidade: 'kg',
-      estoqueMinimo: 120,
+      estoqueMinimo: 100,
       ativo: true,
     },
   });
 
-  const materialPlastico = await prisma.produto.upsert({
+  const produtoPlastico = await prisma.produto.upsert({
     where: { codigo: 'PLA-01' },
     update: {},
     create: {
@@ -58,27 +58,53 @@ async function main() {
   });
 
   await prisma.estoque.upsert({
-    where: { produtoId: materialAco.id },
-    update: { quantidade: 320, unidade: 'kg', estoqueMinimo: 120, status: 'NORMAL' },
-    create: { produtoId: materialAco.id, quantidade: 320, unidade: 'kg', estoqueMinimo: 120, status: 'NORMAL' },
+    where: { produtoId: produtoAco.id },
+    update: {},
+    create: {
+      produtoId: produtoAco.id,
+      quantidade: 350,
+      unidade: 'kg',
+      estoqueMinimo: 100,
+      status: 'NORMAL',
+    },
   });
 
   await prisma.estoque.upsert({
-    where: { produtoId: materialPlastico.id },
-    update: { quantidade: 60, unidade: 'kg', estoqueMinimo: 80, status: 'BAIXO' },
-    create: { produtoId: materialPlastico.id, quantidade: 60, unidade: 'kg', estoqueMinimo: 80, status: 'BAIXO' },
+    where: { produtoId: produtoPlastico.id },
+    update: {},
+    create: {
+      produtoId: produtoPlastico.id,
+      quantidade: 55,
+      unidade: 'kg',
+      estoqueMinimo: 80,
+      status: 'BAIXO',
+    },
   });
 
-  const cnc01 = await prisma.maquina.upsert({
+  const maquina1 = await prisma.maquina.upsert({
     where: { codigo: 'CNC-01' },
     update: {},
-    create: { nome: 'CNC 01', codigo: 'CNC-01', setor: 'FRESAMENTO', status: 'EM_PRODUCAO', capacidade: 120, observacao: 'Máquina principal' },
+    create: {
+      nome: 'CNC 01',
+      codigo: 'CNC-01',
+      setor: 'FRESAMENTO',
+      status: 'EM_PRODUCAO',
+      capacidade: 120,
+      observacao: 'Máquina principal de fresamento.',
+    },
   });
 
-  const prensa01 = await prisma.maquina.upsert({
+  const maquina2 = await prisma.maquina.upsert({
     where: { codigo: 'PRS-01' },
     update: {},
-    create: { nome: 'Prensa 01', codigo: 'PRS-01', setor: 'MONTAGEM', status: 'DISPONIVEL', capacidade: 90, observacao: 'Suporte de componentes' },
+    create: {
+      nome: 'Prensa 01',
+      codigo: 'PRS-01',
+      setor: 'MONTAGEM',
+      status: 'DISPONIVEL',
+      capacidade: 90,
+      observacao: 'Suporte para montagem.',
+    },
   });
 
   const ordem1 = await prisma.ordem.upsert({
@@ -92,10 +118,10 @@ async function main() {
       quantidadeRestante: 120,
       prioridade: 'ALTA',
       status: 'EM_PRODUCAO',
-      observacoes: 'Produção de lote de apoio.',
+      observacoes: 'Lote inicial para atendimento de cliente.',
       dataInicio: new Date(),
-      prazo: new Date(Date.now() + 86400000 * 3),
-      maquinaId: cnc01.id,
+      prazo: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3),
+      maquinaId: maquina1.id,
       responsavelId: funcionario.id,
       criadoPorId: gestor.id,
     },
@@ -112,9 +138,9 @@ async function main() {
       quantidadeRestante: 150,
       prioridade: 'MEDIA',
       status: 'AGUARDANDO',
-      observacoes: 'Aguardando liberação do material.',
-      prazo: new Date(Date.now() + 86400000 * 5),
-      maquinaId: prensa01.id,
+      observacoes: 'Aguardando material para iniciar.',
+      prazo: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5),
+      maquinaId: maquina2.id,
       responsavelId: funcionario.id,
       criadoPorId: gestor.id,
     },
@@ -124,11 +150,11 @@ async function main() {
     where: { id: 1 },
     update: {},
     create: {
-      titulo: 'Ajuste inicial da máquina CNC 01',
-      descricao: 'Validar ajuste e ferramenta para início da produção.',
+      titulo: 'Ajuste inicial da CNC 01',
+      descricao: 'Validar ferramenta e alinhamento do eixo principal.',
       prioridade: 'ALTA',
       status: 'ACEITA',
-      prazo: new Date(Date.now() + 86400000),
+      prazo: new Date(Date.now() + 1000 * 60 * 60 * 24),
       ordemId: ordem1.id,
       criadaPorId: gestor.id,
       responsavelId: funcionario.id,
@@ -136,15 +162,15 @@ async function main() {
     },
   });
 
-  await prisma.tarefa.upsert({
+  const tarefa2 = await prisma.tarefa.upsert({
     where: { id: 2 },
     update: {},
     create: {
       titulo: 'Conferir material de plástico',
-      descricao: 'Verificar quantidade e qualidade antes da produção',
+      descricao: 'Verificar disponibilidade e qualidade do material antes do início.',
       prioridade: 'MEDIA',
       status: 'PENDENTE',
-      prazo: new Date(Date.now() + 86400000 * 2),
+      prazo: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2),
       criadaPorId: gestor.id,
       responsavelId: funcionario.id,
     },
@@ -156,10 +182,10 @@ async function main() {
     create: {
       tipo: 'MAQUINA',
       titulo: 'Troca de ferramenta',
-      descricao: 'Foi necessária troca de ferramenta na CNC 01.',
+      descricao: 'Houve necessidade de troca de ferramenta na CNC 01.',
       prioridade: 'MEDIA',
       status: 'ABERTA',
-      maquinaId: cnc01.id,
+      maquinaId: maquina1.id,
       ordemId: ordem1.id,
       usuarioId: funcionario.id,
     },
@@ -171,11 +197,22 @@ async function main() {
     create: {
       tipo: 'MATERIAL',
       titulo: 'Solicitação de resina',
-      descricao: 'Necessidade de resina para manutenção da linha.',
+      descricao: 'Necessidade de resina para área de manutenção.',
       prioridade: 'ALTA',
       status: 'ABERTO',
       usuarioId: funcionario.id,
-      observacao: 'Pedido interno para área de manutenção.',
+      observacao: 'Pedido interno para manutenção.',
+    },
+  });
+
+  await prisma.planejamento.create({
+    data: {
+      ordemId: ordem1.id,
+      maquinaId: maquina1.id,
+      data: new Date(),
+      horarioInicio: '08:00',
+      horarioFim: '12:00',
+      status: 'PLANEJADO',
     },
   });
 
@@ -185,7 +222,7 @@ async function main() {
       acao: 'SEED',
       entidade: 'Usuario',
       entidadeId: gestor.id.toString(),
-      descricao: 'Seed inicial do sistema ProductionFlow concluído.',
+      descricao: 'Seed inicial executado com usuários e dados de demonstração.',
       ip: '127.0.0.1',
     },
   });
@@ -201,15 +238,25 @@ async function main() {
     },
   });
 
-  console.log('Seed executado com usuários, máquinas, ordens e dados iniciais.');
+  await prisma.auditLog.create({
+    data: {
+      usuarioId: funcionario.id,
+      acao: 'CRIAR_PEDIDO',
+      entidade: 'Pedido',
+      entidadeId: '1',
+      descricao: `Funcionário ${funcionario.nome} abriu pedido de material.`,
+      ip: '127.0.0.1',
+    },
+  });
+
+  console.log('Seed do ProductionFlow finalizado.');
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (error) => {
+  .catch((error) => {
     console.error(error);
-    await prisma.$disconnect();
     process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
   });

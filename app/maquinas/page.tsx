@@ -1,3 +1,63 @@
-"use client";
-import Header from "@/components/Header"; import Card from "@/components/Card"; import StatusBadge from "@/components/StatusBadge"; import {useData} from "@/components/DataProvider"; import {MachineStatus} from "@/lib/types";
-export default function Maquinas(){const {machines,orders,updateMachine}=useData();const op=machines.map(m=>({m,o:orders.find(o=>o.maquina===m.nome&&o.status==="EM_PRODUCAO")}));return <><Header titulo="Máquinas" descricao="Disponibilidade e situação dos recursos produtivos"/><div className="grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">{op.map(({m,o})=><Card key={m.id}><div className="flex items-start justify-between"><div><p className="font-semibold">{m.nome}</p><p className="text-xs text-apagado">Código {m.codigo}</p></div><StatusBadge valor={m.status}/></div>{o&&<div className="mt-4 rounded-lg bg-slate-100 p-3 text-sm"><p className="font-medium">OP #{o.id}</p><p className="text-xs text-apagado">{o.produto}</p></div>}<select value={m.status} onChange={e=>updateMachine(m.id,e.target.value as MachineStatus)} className="mt-4 w-full rounded-lg border border-risco bg-white px-3 py-2 text-sm"><option value="DISPONIVEL">Disponível</option><option value="PRODUZINDO">Produzindo</option><option value="MANUTENCAO">Manutenção</option></select></Card>)}</div></>}
+import { prisma } from '@/lib/prisma';
+import { createUsuarioAction } from '@/lib/actions';
+import { requireRole } from '@/lib/auth';
+import { statusClass } from '@/lib/ui';
+
+export default async function FuncionariosPage() {
+  await requireRole(['GESTOR']);
+  const funcionarios = await prisma.usuario.findMany({ orderBy: { createdAt: 'desc' } });
+
+  return (
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6">
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Funcionários</p>
+          <h1 className="text-3xl font-bold text-slate-900">Cadastro de funcionários</h1>
+        </div>
+
+        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">Novo usuário</h2>
+          <form action={createUsuarioAction} className="grid gap-4 md:grid-cols-3">
+            <input name="nome" placeholder="Nome" className="rounded-xl border border-slate-300 px-3 py-2" required />
+            <input name="email" type="email" placeholder="E-mail" className="rounded-xl border border-slate-300 px-3 py-2" required />
+            <input name="senha" type="password" placeholder="Senha" className="rounded-xl border border-slate-300 px-3 py-2" required />
+            <select name="perfil" className="rounded-xl border border-slate-300 px-3 py-2">
+              <option value="FUNCIONARIO">Funcionário</option>
+              <option value="GESTOR">Gestor</option>
+            </select>
+            <select name="cargo" className="rounded-xl border border-slate-300 px-3 py-2">
+              <option value="OPERADOR">Operador</option>
+              <option value="SUPERVISOR">Supervisor</option>
+              <option value="PCP">PCP</option>
+              <option value="GESTOR">Gestor</option>
+            </select>
+            <button type="submit" className="rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-500">Salvar</button>
+          </form>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 font-semibold text-slate-700">Nome</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">E-mail</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Perfil</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {funcionarios.map((funcionario) => (
+                <tr key={funcionario.id}>
+                  <td className="px-4 py-3 font-medium text-slate-900">{funcionario.nome}</td>
+                  <td className="px-4 py-3">{funcionario.email}</td>
+                  <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(funcionario.perfil)}`}>{funcionario.perfil}</span></td>
+                  <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(funcionario.status)}`}>{funcionario.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  );
+}

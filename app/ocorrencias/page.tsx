@@ -1,3 +1,74 @@
-"use client";
-import {FormEvent,useState} from "react"; import Header from "@/components/Header"; import Card from "@/components/Card"; import StatusBadge from "@/components/StatusBadge"; import {useData} from "@/components/DataProvider"; import {dataHora,minutosParada} from "@/lib/utils";
-export default function Ocorrencias(){const {occurrences,machines,orders,addOccurrence,closeOccurrence}=useData();const [form,setForm]=useState({maquina:"CNC-01",ordem:"",tipo:"PARADA" as "PARADA"|"FALHA"|"ATRASO",descricao:""});function salvar(e:FormEvent){e.preventDefault();if(!form.descricao)return;addOccurrence({maquina:form.maquina,ordem:form.ordem?Number(form.ordem):undefined,tipo:form.tipo,descricao:form.descricao,inicio:new Date().toISOString()});setForm({...form,descricao:"",ordem:""})}return <><Header titulo="Ocorrências" descricao="Paradas, falhas e atrasos da produção"/><div className="grid gap-6 p-6 lg:grid-cols-[360px_1fr]"><Card titulo="Registrar ocorrência"><form onSubmit={salvar} className="space-y-4"><label className="block text-sm font-medium">Máquina<select value={form.maquina} onChange={e=>setForm({...form,maquina:e.target.value})} className="mt-1.5 w-full rounded-lg border border-risco px-3 py-2.5">{machines.map(m=><option key={m.id}>{m.nome}</option>)}</select></label><label className="block text-sm font-medium">OP (opcional)<select value={form.ordem} onChange={e=>setForm({...form,ordem:e.target.value})} className="mt-1.5 w-full rounded-lg border border-risco px-3 py-2.5"><option value="">Nenhuma</option>{orders.map(o=><option key={o.id} value={o.id}>#{o.id} · {o.produto}</option>)}</select></label><label className="block text-sm font-medium">Tipo<select value={form.tipo} onChange={e=>setForm({...form,tipo:e.target.value as typeof form.tipo})} className="mt-1.5 w-full rounded-lg border border-risco px-3 py-2.5"><option value="PARADA">Parada</option><option value="FALHA">Falha</option><option value="ATRASO">Atraso</option></select></label><label className="block text-sm font-medium">Descrição<textarea value={form.descricao} onChange={e=>setForm({...form,descricao:e.target.value})} rows={4} className="mt-1.5 w-full rounded-lg border border-risco px-3 py-2.5" placeholder="Descreva o ocorrido..."/></label><button className="w-full rounded-lg bg-sinal py-2.5 font-semibold text-white">Registrar</button></form></Card><Card titulo="Histórico"><div className="space-y-3">{occurrences.map(o=><div key={o.id} className="rounded-lg border border-risco p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><StatusBadge valor={o.tipo}/><span className="text-xs text-apagado">#{o.id}</span></div>{!o.fim&&<button onClick={()=>closeOccurrence(o.id)} className="rounded bg-ok/10 px-2.5 py-1.5 text-xs font-semibold text-ok">Encerrar</button>}</div><p className="mt-2 font-medium">{o.descricao}</p><p className="mt-1 text-xs text-apagado">{o.maquina}{o.ordem?` · OP #${o.ordem}`:""} · início {dataHora(o.inicio)}</p><p className="mt-1 text-xs text-apagado">{o.fim?`Duração: ${minutosParada(o.inicio,o.fim)} min`:`Em aberto · ${minutosParada(o.inicio)} min`}</p></div>)}</div></Card></div></>}
+import { prisma } from '@/lib/prisma';
+import { createMovimentacaoAction, createProdutoAction } from '@/lib/actions';
+import { requireRole } from '@/lib/auth';
+import { statusClass } from '@/lib/ui';
+
+export default async function EstoquePage() {
+  await requireRole(['GESTOR']);
+  const produtos = await prisma.produto.findMany({ include: { estoque: true }, orderBy: { nome: 'asc' } });
+
+  return (
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6">
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Estoque</p>
+          <h1 className="text-3xl font-bold text-slate-900">Controle de materiais</h1>
+        </div>
+
+        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">Cadastrar produto</h2>
+          <form action={createProdutoAction} className="grid gap-4 md:grid-cols-4">
+            <input name="nome" placeholder="Produto" className="rounded-xl border border-slate-300 px-3 py-2" required />
+            <input name="codigo" placeholder="Código" className="rounded-xl border border-slate-300 px-3 py-2" required />
+            <input name="unidade" placeholder="Unidade" className="rounded-xl border border-slate-300 px-3 py-2" defaultValue="kg" />
+            <input name="estoqueMinimo" type="number" placeholder="Estoque mínimo" className="rounded-xl border border-slate-300 px-3 py-2" />
+            <button type="submit" className="md:col-span-4 rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-500">Salvar produto</button>
+          </form>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 font-semibold text-slate-700">Produto</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Código</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Quantidade</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Mínimo</th>
+                <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {produtos.map((produto) => (
+                <tr key={produto.id}>
+                  <td className="px-4 py-3 font-medium text-slate-900">{produto.nome}</td>
+                  <td className="px-4 py-3">{produto.codigo}</td>
+                  <td className="px-4 py-3">{produto.estoque?.quantidade ?? 0} {produto.unidade}</td>
+                  <td className="px-4 py-3">{produto.estoqueMinimo}</td>
+                  <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusClass(produto.estoque?.status ?? 'NORMAL')}`}>{produto.estoque?.status ?? 'NORMAL'}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">Registrar movimentação</h2>
+          <form action={createMovimentacaoAction} className="grid gap-4 md:grid-cols-4">
+            <select name="produtoId" className="rounded-xl border border-slate-300 px-3 py-2">
+              {produtos.map((prod) => (
+                <option key={prod.id} value={prod.id}>{prod.nome}</option>
+              ))}
+            </select>
+            <select name="tipo" className="rounded-xl border border-slate-300 px-3 py-2">
+              <option value="ENTRADA">Entrada</option>
+              <option value="SAIDA">Saída</option>
+            </select>
+            <input name="quantidade" type="number" min="1" placeholder="Quantidade" className="rounded-xl border border-slate-300 px-3 py-2" />
+            <input name="observacao" placeholder="Observação" className="rounded-xl border border-slate-300 px-3 py-2" />
+            <button type="submit" className="md:col-span-4 rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-500">Registrar</button>
+          </form>
+        </div>
+      </div>
+    </main>
+  );
+}
