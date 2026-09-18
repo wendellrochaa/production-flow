@@ -14,9 +14,10 @@ export default function DetalheOrdem({ params }: { params: { id: string } }) {
   const { orders, addProduction, updateOrder } = useData();
   const [modal, setModal] = useState(false);
   const [qtd, setQtd] = useState("");
-  const ordem = orders.find((order) => order.id === Number(params.id));
 
-  if (ordem === undefined) {
+  const ordemEncontrada = orders.find((order) => order.id === Number(params.id));
+
+  if (!ordemEncontrada) {
     return (
       <>
         <Header titulo="OP não encontrada" />
@@ -29,6 +30,7 @@ export default function DetalheOrdem({ params }: { params: { id: string } }) {
     );
   }
 
+  const ordem = ordemEncontrada;
   const pct = percentual(ordem.produzido, ordem.quantidade);
 
   function apontar() {
