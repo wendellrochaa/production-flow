@@ -15,7 +15,9 @@ export default function DetalheOrdem({ params }: { params: { id: string } }) {
   const [modal, setModal] = useState(false);
   const [qtd, setQtd] = useState("");
 
-  const ordemEncontrada = orders.find((order) => order.id === Number(params.id));
+  const ordemEncontrada = orders.find(
+    (order) => order.id === Number(params.id),
+  );
 
   if (!ordemEncontrada) {
     return (
@@ -30,14 +32,19 @@ export default function DetalheOrdem({ params }: { params: { id: string } }) {
     );
   }
 
+  // Alias criado depois da guarda para que o TypeScript saiba que a ordem
+  // permanece definida também dentro da função apontar.
   const ordem = ordemEncontrada;
+  const ordemId = ordem.id;
   const pct = percentual(ordem.produzido, ordem.quantidade);
 
   function apontar() {
     const quantidade = Number(qtd);
+
     if (quantidade > 0) {
-      addProduction(ordem.id, quantidade);
+      addProduction(ordemId, quantidade);
     }
+
     setQtd("");
     setModal(false);
   }
@@ -88,19 +95,19 @@ export default function DetalheOrdem({ params }: { params: { id: string } }) {
 
           <div className="mt-6 flex flex-wrap gap-2">
             <button
-              onClick={() => updateOrder(ordem.id, { status: "EM_PRODUCAO" })}
+              onClick={() => updateOrder(ordemId, { status: "EM_PRODUCAO" })}
               className="rounded-lg bg-ok/10 px-3 py-2 text-sm font-semibold text-ok"
             >
               Iniciar
             </button>
             <button
-              onClick={() => updateOrder(ordem.id, { status: "PAUSADA" })}
+              onClick={() => updateOrder(ordemId, { status: "PAUSADA" })}
               className="rounded-lg bg-atencao/10 px-3 py-2 text-sm font-semibold text-atencao"
             >
               Pausar
             </button>
             <button
-              onClick={() => updateOrder(ordem.id, { status: "FINALIZADA" })}
+              onClick={() => updateOrder(ordemId, { status: "FINALIZADA" })}
               className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold"
             >
               Finalizar
