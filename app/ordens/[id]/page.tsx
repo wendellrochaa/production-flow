@@ -12,11 +12,11 @@ import { data, percentual } from "@/lib/utils";
 export default function DetalheOrdem({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { orders, addProduction, updateOrder } = useData();
-  const base = orders.find((order) => order.id === Number(params.id));
   const [modal, setModal] = useState(false);
   const [qtd, setQtd] = useState("");
+  const ordem = orders.find((order) => order.id === Number(params.id));
 
-  if (!base) {
+  if (ordem === undefined) {
     return (
       <>
         <Header titulo="OP não encontrada" />
@@ -29,9 +29,6 @@ export default function DetalheOrdem({ params }: { params: { id: string } }) {
     );
   }
 
-  // Captura a ordem depois da guarda acima. Dessa forma, funções aninhadas
-  // também trabalham com um valor comprovadamente definido.
-  const ordem = base;
   const pct = percentual(ordem.produzido, ordem.quantidade);
 
   function apontar() {
@@ -116,11 +113,7 @@ export default function DetalheOrdem({ params }: { params: { id: string } }) {
         </Card>
       </div>
 
-      <Modal
-        titulo="Apontar produção"
-        aberto={modal}
-        aoFechar={() => setModal(false)}
-      >
+      <Modal titulo="Apontar produção" aberto={modal} aoFechar={() => setModal(false)}>
         <label className="block text-sm font-medium">
           Peças produzidas
           <input
