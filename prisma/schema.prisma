@@ -8,120 +8,215 @@ datasource db {
 }
 
 model Usuario {
-  id       Int      @id @default(autoincrement())
-  nome     String
-  email    String   @unique
-  senha    String
-  perfil   String   @default("OPERADOR")
-  criadoEm DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  nome      String
+  email     String   @unique
+  senha     String
+  perfil    String   @default("FUNCIONARIO")
+  cargo     String   @default("OPERADOR")
+  status    String   @default("ATIVO")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  ordens      Ordem[]
-  ocorrencias Ocorrencia[]
-  movimentos  MovimentoEstoque[]
+  ordensCriadas      Ordem[]      @relation("OrdemCriadaPor")
+  ordensResponsavel  Ordem[]      @relation("OrdemResponsavel")
+  tarefasCriadas     Tarefa[]     @relation("TarefaCriadaPor")
+  tarefasResponsavel Tarefa[]     @relation("TarefaResponsavel")
+  tarefasAceitas     Tarefa[]     @relation("TarefaAceitaPor")
+  tarefasIniciadas   Tarefa[]     @relation("TarefaIniciadaPor")
+  tarefasConcluidas  Tarefa[]     @relation("TarefaConcluidaPor")
+  pedidos            Pedido[]
+  ocorrencias        Ocorrencia[]
+  movimentoEstoque   MovimentoEstoque[]
+  auditorias         AuditLog[]
 }
 
 model Produto {
-  id      Int     @id @default(autoincrement())
-  nome    String
-  codigo  String  @unique
-  unidade String  @default("un")
-  ativo   Boolean @default(true)
+  id          Int      @id @default(autoincrement())
+  nome        String
+  codigo      String   @unique
+  unidade     String   @default("un")
+  estoqueMinimo Int     @default(0)
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  ordens  Ordem[]
-  estoque Estoque?
+  estoque     Estoque?
+  movimentacoes MovimentoEstoque[]
 }
 
 model Ordem {
-  id        Int     @id @default(autoincrement())
-  produtoId Int
-  produto   Produto @relation(fields: [produtoId], references: [id])
+  id                   Int       @id @default(autoincrement())
+  codigo               String    @unique
+  produto              String
+  quantidadePlanejada  Int
+  quantidadeProduzida  Int       @default(0)
+  quantidadeRestante   Int       @default(0)
+  prioridade           String    @default("NORMAL")
+  status               String    @default("AGUARDANDO")
+  observacoes          String?
+  dataCriacao          DateTime  @default(now())
+  dataInicio           DateTime?
+  prazo                DateTime?
+  dataConclusao        DateTime?
 
-  quantidade  Int
-  produzido   Int     @default(0)
-  prioridade  String  @default("NORMAL")
-  status      String  @default("AGUARDANDO")
-  responsavel String?
+  maquinaId            Int?
+  maquina              Maquina?  @relation(fields: [maquinaId], references: [id])
 
-  maquinaId Int?
-  maquina   Maquina? @relation(fields: [maquinaId], references: [id])
+  responsavelId        Int?
+  responsavel          Usuario?  @relation("OrdemResponsavel", fields: [responsavelId], references: [id])
 
-  criadoPorId Int
-  criadoPor   Usuario @relation(fields: [criadoPorId], references: [id])
+  criadoPorId          Int
+  criadoPor            Usuario   @relation("OrdemCriadaPor", fields: [criadoPorId], references: [id])
 
-  dataInicio   DateTime
-  dataEntrega  DateTime
-  finalizadoEm DateTime?
-  criadoEm     DateTime  @default(now())
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  planejamentos Planejamento[]
-  ocorrencias   Ocorrencia[]
+  tarefas              Tarefa[]
+  ocorrencias          Ocorrencia[]
+  planejamentos        Planejamento[]
 }
 
-model Planejamento {
-  id      Int   @id @default(autoincrement())
-  ordemId Int
-  ordem   Ordem @relation(fields: [ordemId], references: [id], onDelete: Cascade)
+model Tarefa {
+  id                Int       @id @default(autoincrement())
+  titulo            String
+  descricao         String
+  prioridade        String    @default("MEDIA")
+  status            String    @default("PENDENTE")
+  prazo             DateTime?
+  observacao        String?
 
-  maquinaId Int
-  maquina   Maquina @relation(fields: [maquinaId], references: [id])
+  ordemId           Int?
+  ordem             Ordem?    @relation(fields: [ordemId], references: [id])
 
-  data       DateTime
-  horaInicio String
-  horaFim    String
+  criadaPorId       Int
+  criadaPor         Usuario   @relation("TarefaCriadaPor", fields: [criadaPorId], references: [id])
+
+  responsavelId     Int?
+  responsavel       Usuario?  @relation("TarefaResponsavel", fields: [responsavelId], references: [id])
+
+  aceitaPorId       Int?
+  aceitaPor         Usuario?  @relation("TarefaAceitaPor", fields: [aceitaPorId], references: [id])
+
+  iniciadaPorId     Int?
+  iniciadaPor       Usuario?  @relation("TarefaIniciadaPor", fields: [iniciadaPorId], references: [id])
+
+  concluidaPorId    Int?
+  concluidaPor      Usuario?  @relation("TarefaConcluidaPor", fields: [concluidaPorId], references: [id])
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 model Maquina {
-  id     Int    @id @default(autoincrement())
-  nome   String
-  codigo String @unique
-  status String @default("DISPONIVEL")
+  id          Int      @id @default(autoincrement())
+  nome        String
+  codigo      String   @unique
+  setor       String   @default("PRODUCAO")
+  status      String   @default("DISPONIVEL")
+  capacidade  Int      @default(0)
+  observacao  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  ordens        Ordem[]
+  ordens      Ordem[]
+  ocorrencias Ocorrencia[]
   planejamentos Planejamento[]
-  ocorrencias   Ocorrencia[]
 }
 
 model Estoque {
-  id        Int     @id @default(autoincrement())
-  produtoId Int     @unique
-  produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  id            Int      @id @default(autoincrement())
+  produtoId     Int      @unique
+  produto       Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  quantidade    Float    @default(0)
+  unidade       String   @default("un")
+  estoqueMinimo Float    @default(0)
+  status        String   @default("NORMAL")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  quantidade    Float  @default(0)
-  unidade       String @default("un")
-  estoqueMinimo Float  @default(0)
-
-  movimentos MovimentoEstoque[]
+  movimentacoes MovimentoEstoque[]
 }
 
 model MovimentoEstoque {
-  id        Int     @id @default(autoincrement())
-  estoqueId Int
-  estoque   Estoque @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
+  id          Int      @id @default(autoincrement())
+  tipo        String
+  quantidade  Float
+  observacao  String?
+  createdAt   DateTime @default(now())
 
-  tipo       String
-  quantidade Float
-  observacao String?
+  produtoId   Int
+  produto     Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
 
-  usuarioId Int
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  usuarioId   Int
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
 
-  criadoEm DateTime @default(now())
+  estoqueId   Int?
+  estoque     Estoque? @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
 }
 
 model Ocorrencia {
-  id Int @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
+  tipo        String
+  titulo      String
+  descricao   String
+  prioridade  String   @default("MEDIA")
+  status      String   @default("ABERTA")
+  data        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  maquinaId Int?
-  maquina   Maquina? @relation(fields: [maquinaId], references: [id])
+  maquinaId   Int?
+  maquina     Maquina? @relation(fields: [maquinaId], references: [id])
 
-  ordemId Int?
-  ordem   Ordem? @relation(fields: [ordemId], references: [id])
+  ordemId     Int?
+  ordem       Ordem?   @relation(fields: [ordemId], references: [id])
 
-  usuarioId Int
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  usuarioId   Int
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+}
 
-  tipo      String
-  descricao String
-  inicio    DateTime  @default(now())
-  fim       DateTime?
+model Pedido {
+  id          Int      @id @default(autoincrement())
+  tipo        String
+  titulo      String
+  descricao   String
+  prioridade  String   @default("MEDIA")
+  status      String   @default("ABERTO")
+  dataPedido  DateTime @default(now())
+  observacao  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  usuarioId   Int
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+}
+
+model Planejamento {
+  id          Int      @id @default(autoincrement())
+  data        DateTime
+  horarioInicio String
+  horarioFim  String
+  status      String   @default("PLANEJADO")
+  prazo       DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ordemId     Int
+  ordem       Ordem    @relation(fields: [ordemId], references: [id], onDelete: Cascade)
+
+  maquinaId   Int
+  maquina     Maquina  @relation(fields: [maquinaId], references: [id])
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  usuarioId   Int
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  acao        String
+  entidade    String
+  entidadeId  String?
+  descricao   String
+  dataHora    DateTime @default(now())
+  ip          String?
 }
