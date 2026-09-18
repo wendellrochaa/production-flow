@@ -31,7 +31,7 @@ export default function LoginPage() {
               type="email"
               required
               placeholder="nome@adm.com"
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-slate-50 outline-none ring-0 transition focus:border-cyan-400"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-slate-50 outline-none transition focus:border-cyan-400"
             />
           </div>
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
               type="password"
               required
               placeholder="••••••••"
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-slate-50 outline-none ring-0 transition focus:border-cyan-400"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-slate-50 outline-none transition focus:border-cyan-400"
             />
           </div>
 
@@ -63,12 +63,6 @@ export default function LoginPage() {
             {isPending ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-
-        <div className="border-t border-slate-800 bg-slate-950/40 px-6 py-4 text-xs text-slate-400">
-          <p>Credenciais iniciais:</p>
-          <p>Gestor: gestor@adm.com / Admin123!</p>
-          <p>Funcionário: funcionario@funcionario.com / Funcionario123!</p>
-        </div>
       </div>
     </main>
   );
