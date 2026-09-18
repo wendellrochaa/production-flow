@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id       Int      @id @default(autoincrement())
+  nome     String
+  email    String   @unique
+  senha    String
+  perfil   String   @default("OPERADOR")
+  criadoEm DateTime @default(now())
+
+  ordens      Ordem[]
+  ocorrencias Ocorrencia[]
+  movimentos  MovimentoEstoque[]
+}
+
+model Produto {
+  id      Int     @id @default(autoincrement())
+  nome    String
+  codigo  String  @unique
+  unidade String  @default("un")
+  ativo   Boolean @default(true)
+
+  ordens  Ordem[]
+  estoque Estoque?
+}
+
+model Ordem {
+  id        Int     @id @default(autoincrement())
+  produtoId Int
+  produto   Produto @relation(fields: [produtoId], references: [id])
+
+  quantidade  Int
+  produzido   Int     @default(0)
+  prioridade  String  @default("NORMAL")
+  status      String  @default("AGUARDANDO")
+  responsavel String?
+
+  maquinaId Int?
+  maquina   Maquina? @relation(fields: [maquinaId], references: [id])
+
+  criadoPorId Int
+  criadoPor   Usuario @relation(fields: [criadoPorId], references: [id])
+
+  dataInicio   DateTime
+  dataEntrega  DateTime
+  finalizadoEm DateTime?
+  criadoEm     DateTime  @default(now())
+
+  planejamentos Planejamento[]
+  ocorrencias   Ocorrencia[]
+}
+
+model Planejamento {
+  id      Int   @id @default(autoincrement())
+  ordemId Int
+  ordem   Ordem @relation(fields: [ordemId], references: [id], onDelete: Cascade)
+
+  maquinaId Int
+  maquina   Maquina @relation(fields: [maquinaId], references: [id])
+
+  data       DateTime
+  horaInicio String
+  horaFim    String
+}
+
+model Maquina {
+  id     Int    @id @default(autoincrement())
+  nome   String
+  codigo String @unique
+  status String @default("DISPONIVEL")
+
+  ordens        Ordem[]
+  planejamentos Planejamento[]
+  ocorrencias   Ocorrencia[]
+}
+
+model Estoque {
+  id        Int     @id @default(autoincrement())
+  produtoId Int     @unique
+  produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  quantidade    Float  @default(0)
+  unidade       String @default("un")
+  estoqueMinimo Float  @default(0)
+
+  movimentos MovimentoEstoque[]
+}
+
+model MovimentoEstoque {
+  id        Int     @id @default(autoincrement())
+  estoqueId Int
+  estoque   Estoque @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
+
+  tipo       String
+  quantidade Float
+  observacao String?
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  criadoEm DateTime @default(now())
+}
+
+model Ocorrencia {
+  id Int @id @default(autoincrement())
+
+  maquinaId Int?
+  maquina   Maquina? @relation(fields: [maquinaId], references: [id])
+
+  ordemId Int?
+  ordem   Ordem? @relation(fields: [ordemId], references: [id])
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  tipo      String
+  descricao String
+  inicio    DateTime  @default(now())
+  fim       DateTime?
+}
