@@ -1,26 +1,70 @@
-import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth';
-import { updatePerfilAction } from '@/lib/actions';
+'use client';
 
-export default async function FuncionarioPerfilPage() {
-  const user = await requireRole(['GESTOR', 'FUNCIONARIO']);
-  const perfil = await prisma.usuario.findUnique({ where: { id: user.id } });
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { logoutAction } from '@/lib/actions';
 
-  if (!perfil) return null;
+const gestorLinks = [
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/ordens', label: 'Ordens de Produção' },
+  { href: '/planejamento', label: 'Planejamento' },
+  { href: '/tarefas', label: 'Tarefas' },
+  { href: '/funcionarios', label: 'Funcionários' },
+  { href: '/maquinas', label: 'Máquinas' },
+  { href: '/estoque', label: 'Estoque' },
+  { href: '/ocorrencias', label: 'Ocorrências' },
+  { href: '/relatorios', label: 'Relatórios' },
+  { href: '/auditoria', label: 'Auditoria' },
+  { href: '/configuracoes', label: 'Configurações' },
+];
+
+const funcionarioLinks = [
+  { href: '/funcionario', label: 'Início' },
+  { href: '/funcionario/tarefas', label: 'Minhas tarefas' },
+  { href: '/funcionario/pedidos', label: 'Meus pedidos' },
+  { href: '/funcionario/ocorrencias', label: 'Minhas reclamações' },
+  { href: '/funcionario/atividades', label: 'Minhas atividades' },
+  { href: '/funcionario/perfil', label: 'Meu perfil' },
+];
+
+export default function Sidebar({ perfil }: { perfil: 'GESTOR' | 'FUNCIONARIO' }) {
+  const pathname = usePathname();
+  const links = perfil === 'GESTOR' ? gestorLinks : funcionarioLinks;
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
-      <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Perfil</p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-900">Dados do usuário</h1>
+    <aside className="hidden min-h-screen w-72 shrink-0 border-r border-slate-200 bg-slate-900 text-white md:flex md:flex-col">
+      <div className="border-b border-slate-800 px-6 py-5">
+        <Link href={perfil === 'GESTOR' ? '/dashboard' : '/funcionario'} className="text-2xl font-bold text-cyan-300">
+          ProductionFlow
+        </Link>
+        <div className="mt-2 text-sm text-slate-400">{perfil === 'GESTOR' ? 'Gestor' : 'Funcionário'}</div>
+      </div>
 
-        <form action={updatePerfilAction} className="mt-6 space-y-4">
-          <input name="nome" defaultValue={perfil.nome} className="w-full rounded-xl border border-slate-300 px-3 py-2" required />
-          <input name="cargo" defaultValue={perfil.cargo} className="w-full rounded-xl border border-slate-300 px-3 py-2" />
-          <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">E-mail: {perfil.email}</div>
-          <button type="submit" className="w-full rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-500">Salvar alterações</button>
+      <nav aria-label="Navegação principal" className="flex-1 space-y-1 p-4">
+        {links.map((link) => {
+          const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={active ? 'page' : undefined}
+              className={`flex items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
+                active ? 'bg-cyan-500 text-slate-950' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              {link.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="border-t border-slate-800 p-4">
+        <form action={logoutAction}>
+          <button type="submit" className="w-full rounded-xl bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700">
+            Sair
+          </button>
         </form>
       </div>
-    </main>
+    </aside>
   );
 }

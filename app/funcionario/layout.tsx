@@ -1,15 +1,13 @@
-import { getCurrentUser } from '@/lib/auth';
+import { requireRole } from '@/lib/auth';
 import Sidebar from '@/components/Sidebar';
-import { redirect } from 'next/navigation';
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-  if (!user || user.perfil !== 'GESTOR') redirect('/login');
+export default async function FuncionarioLayout({ children }: { children: React.ReactNode }) {
+  const user = await requireRole(['FUNCIONARIO']);
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar perfil={user.perfil} />
-      <div className="flex-1">{children}</div>
+      <Sidebar perfil={user.perfil as 'GESTOR' | 'FUNCIONARIO'} />
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
